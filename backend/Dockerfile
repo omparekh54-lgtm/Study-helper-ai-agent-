@@ -17,7 +17,8 @@ RUN pip install -r requirements.txt
 
 COPY app ./app
 
-RUN useradd --create-home --uid 10001 appuser
+# appuser owns /app so the SQLite fallback (used only when DATABASE_URL is unset) can create its file.
+RUN useradd --create-home --uid 10001 appuser && chown -R appuser /app
 USER appuser
 
 EXPOSE 10000
