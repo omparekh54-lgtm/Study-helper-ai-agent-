@@ -105,9 +105,14 @@ class GeminiGenerator:
                             self._cooldown[model] = time.monotonic() + (3600 if daily else 90)
                             log.warning("Gemini %s rate-limited (%s); switching model", model, "daily" if daily else "rpm")
                             break
-                        await asyncio.sleep(retry_delay_from_text(msg, 20))
+                        delay = retry_delay_from_text(msg, 20)
+                        log.info("Gemini %s rate-limited; retrying in %.0fs", model, delay)
+                        await asyncio.sleep(delay)
                         continue
                     if code >= 500:
+                        log.warning("Gemini %s server error %s (attempt %d): %s", model, code, attempt + 1, exc.message)
+                        if attempt >= 1:
+                            break  # overloaded model: move on instead of stalling the pipeline
                         await asyncio.sleep(min(2 ** attempt * 3, 30))
                         continue
                     log.warning("Gemini %s error %s: %s", model, code, exc.message)
@@ -122,6 +127,9 @@ class GeminiGenerator:
 
                 except (httpx.HTTPError, asyncio.TimeoutError) as exc:
                     last_error = exc
+                    log.warning("Gemini %s network error (attempt %d): %r", model, attempt + 1, exc)
+                    if isinstance(exc, (httpx.TimeoutException, asyncio.TimeoutError)):
+                        break  # a model that timed out once will likely do it again; try the next one
                     await asyncio.sleep(min(2 ** attempt * 3, 30))
                     continue
 
