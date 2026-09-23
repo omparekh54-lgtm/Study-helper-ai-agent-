@@ -1,0 +1,16 @@
+# Pings the API once a day so the free database never pauses from inactivity.
+# Set the repository variable API_URL (Settings → Secrets and variables → Actions → Variables).
+name: Keep-alive
+
+on:
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    if: vars.API_URL != ''
+    steps:
+      - name: Wake the API and touch the database
+        run: curl --fail --silent --show-error --max-time 120 --retry 3 --retry-delay 20 "${{ vars.API_URL }}/api/health"
