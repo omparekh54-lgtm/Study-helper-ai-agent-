@@ -25,8 +25,8 @@ class Settings(BaseSettings):
     # Tried in order. Unavailable models are skipped automatically, and a model that runs out
     # of free quota hands over to the next one (each model has its own free-tier bucket).
     gemini_models: str = (
-        "gemini-flash-latest,gemini-3.5-flash,gemini-2.5-flash,"
-        "gemini-flash-lite-latest,gemini-3.5-flash-lite,gemini-2.5-flash-lite"
+        "gemini-3.6-flash,gemini-flash-latest,gemini-3.5-flash,"
+        "gemini-3.6-flash-lite,gemini-flash-lite-latest,gemini-3.5-flash-lite,gemini-2.5-flash-lite"
     )
     gemini_rpm: int = 8
     groq_api_key: str = ""
