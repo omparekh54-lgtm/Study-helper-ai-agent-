@@ -55,7 +55,9 @@ class GroqGenerator:
         ready = [m for m in self.models if self._cooldown.get(m, 0) <= now]
         return ready or sorted(self.models, key=lambda m: self._cooldown.get(m, 0))
 
-    async def generate_json(self, *, system: str, prompt: str, schema: type[T], max_output_tokens: int = 2048) -> T:
+    async def generate_json(
+        self, *, system: str, prompt: str, schema: type[T], max_output_tokens: int = 2048, fast: bool = False
+    ) -> T:
         schema_hint = json.dumps(schema.model_json_schema(), separators=(",", ":"))
         system_full = f"{system}\n\nRespond with a single JSON object matching this JSON schema:\n{schema_hint}"
         budget = estimate_tokens(system_full, prompt) + max_output_tokens
