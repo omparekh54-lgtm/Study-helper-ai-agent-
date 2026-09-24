@@ -47,6 +47,7 @@ async def build_outline(generator: JSONGenerator, chunks: list[ChunkRef], char_c
         prompt=outline_prompt(material, char_count),
         schema=Outline,
         max_output_tokens=16_384,
+        fast=True,  # mapping topics is simple work: use the quick Flash-Lite models first
     )
     return normalize_outline(outline, chunks)
 
@@ -118,7 +119,7 @@ async def build_kit(
             topic_title=topic_title, unit_title=unit_title, doc_title=doc_title, summary=summary, source=source
         ),
         schema=StudyKit,
-        max_output_tokens=24_576,
+        max_output_tokens=16_384,
     )
     kit.video = sanitize_beats(kit.video, topic_title)
     kit.youtube_query = _clean(kit.youtube_query, 120) or f"{topic_title} explained"
