@@ -72,9 +72,9 @@ def kit_prompt(
     doc_title: str,
     summary: str,
     source: str,
-    n_mcq: int = 10,
-    n_short: int = 3,
-    n_long: int = 3,
+    n_mcq: int = 8,
+    n_short: int = 2,
+    n_long: int = 2,
     n_beats: int = 6,
 ) -> str:
     return f"""Create a study kit for the topic "{topic_title}" (unit: "{unit_title}", from "{doc_title}").
