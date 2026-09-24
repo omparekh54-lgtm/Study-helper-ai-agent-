@@ -26,7 +26,7 @@ class JSONGenerator(Protocol):
     name: str
 
     async def generate_json(
-        self, *, system: str, prompt: str, schema: type[T], max_output_tokens: int = 8192
+        self, *, system: str, prompt: str, schema: type[T], max_output_tokens: int = 8192, fast: bool = False
     ) -> T: ...
 
 
