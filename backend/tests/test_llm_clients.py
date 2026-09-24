@@ -109,6 +109,54 @@ async def test_gemini_retries_bad_json_then_gives_up():
         await gen.generate_json(system="s", prompt="p", schema=Outline)
 
 
+def _model_of(req: httpx.Request) -> str:
+    return req.url.path.rsplit("/", 1)[-1].split(":")[0]
+
+
+async def test_gemini_rotates_parallel_calls_across_models():
+    used: list[str] = []
+
+    def handler(req, n):
+        used.append(_model_of(req))
+        return gemini_ok(OUTLINE)
+
+    gen, _ = make_gemini(handler, models=("gemini-a", "gemini-b", "gemini-a-lite"))
+    await asyncio.gather(*(gen.generate_json(system="s", prompt="p", schema=Outline) for _ in range(4)))
+    # Full models share the load; the Lite model is only a fallback for normal calls.
+    assert sorted(used) == ["gemini-a", "gemini-a", "gemini-b", "gemini-b"]
+
+
+async def test_gemini_fast_calls_prefer_lite_models():
+    used: list[str] = []
+
+    def handler(req, n):
+        used.append(_model_of(req))
+        return gemini_ok(OUTLINE)
+
+    gen, _ = make_gemini(handler, models=("gemini-a", "gemini-a-lite"))
+    await gen.generate_json(system="s", prompt="p", schema=Outline, fast=True)
+    assert used == ["gemini-a-lite"]
+
+
+async def test_gemini_sends_low_thinking_and_drops_it_if_rejected():
+    bodies: list[dict] = []
+
+    def handler(req, n):
+        body = json.loads(req.content)
+        bodies.append(body)
+        if "thinkingConfig" in body["generationConfig"]:
+            return gemini_error(400, "INVALID_ARGUMENT", "Thinking level is not supported for this model.")
+        return gemini_ok(OUTLINE)
+
+    gen, _ = make_gemini(handler, models=("gemini-3-test",))
+    result = await gen.generate_json(system="s", prompt="p", schema=Outline)
+    assert result.document_title == "Photosynthesis"
+    thinking = bodies[0]["generationConfig"]["thinkingConfig"]
+    assert (thinking.get("thinkingLevel") or thinking.get("thinking_level")) == "LOW"
+    assert "thinkingConfig" not in bodies[1]["generationConfig"]
+    assert gen.models == ["gemini-3-test"]  # the model is kept, not dropped as "unsupported"
+
+
 def groq_ok(payload: dict) -> httpx.Response:
     return httpx.Response(
         200,
