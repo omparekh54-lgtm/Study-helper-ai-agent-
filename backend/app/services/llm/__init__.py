@@ -21,7 +21,9 @@ def get_generator() -> JSONGenerator:
         else:
             from app.services.llm.gemini import GeminiGenerator
 
-            _generator = GeminiGenerator(s.gemini_api_key, s.gemini_model_list, rpm=s.gemini_rpm)
+            _generator = GeminiGenerator(
+                s.gemini_api_key, s.gemini_model_list, rpm=s.gemini_rpm, thinking_level=s.gemini_thinking
+            )
     return _generator
 
 
