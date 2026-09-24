@@ -28,11 +28,13 @@ class Settings(BaseSettings):
         "gemini-3.6-flash,gemini-flash-latest,gemini-3.5-flash,"
         "gemini-3.6-flash-lite,gemini-flash-lite-latest,gemini-3.5-flash-lite,gemini-2.5-flash-lite"
     )
-    gemini_rpm: int = 8
+    gemini_rpm: int = 5  # per model (free-tier Flash allows ~5 requests/minute each)
+    # Gemini 3 "thinking" depth: minimal | low | medium | high ("" = model default). Low is much faster.
+    gemini_thinking: str = "low"
     groq_api_key: str = ""
     groq_models: str = "openai/gpt-oss-120b,openai/gpt-oss-20b"
     groq_rpm: int = 25
-    groq_tpm: int = 7000
+    groq_tpm: int = 7500
 
     # --- Optional integrations ------------------------------------------------
     youtube_api_key: str = ""
@@ -44,7 +46,11 @@ class Settings(BaseSettings):
     uploads_per_ip_per_hour: int = 6
 
     # --- Video ------------------------------------------------------------------
+    # Videos are made automatically once a document's study kits are all ready (so they never slow
+    # the kits down); a user asking for one on a topic page jumps the queue.
     auto_generate_videos: bool = True
+    # How many topics are written in parallel (each goes to a different Gemini model).
+    topic_concurrency: int = 3
     tts_voice: str = "en-US-AndrewNeural"
     video_width: int = 1280
     video_height: int = 720
