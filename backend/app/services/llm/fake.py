@@ -54,7 +54,9 @@ class FakeGenerator:
     def __init__(self, name: str = "fake"):
         self.name = name
 
-    async def generate_json(self, *, system: str, prompt: str, schema: type[T], max_output_tokens: int = 8192) -> T:
+    async def generate_json(
+        self, *, system: str, prompt: str, schema: type[T], max_output_tokens: int = 8192, fast: bool = False
+    ) -> T:
         await asyncio.sleep(0.01)
         if schema is Outline:
             return self._outline(prompt)  # type: ignore[return-value]
