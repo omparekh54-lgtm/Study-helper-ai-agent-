@@ -11,6 +11,7 @@ Items it rejects are dropped; if the verifier is unavailable, items keep a
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import logging
 import random
@@ -124,7 +125,7 @@ def grounding_check(mcqs: list[MCQ], qas: list[QA], chunks: dict[int, SourceChun
         chunk = locate_quote(m.source_quote, chunks, m.chunk_id)
         if chunk is None:
             continue
-        kept_m.append(Checked(shuffle_options(m), chunk, evidence_window(chunk.text, m.source_quote, 500)))
+        kept_m.append(Checked(shuffle_options(m), chunk, evidence_window(chunk.text, m.source_quote, 400)))
     kept_q: list[Checked] = []
     for q in qas:
         if not q.question.strip() or len(q.answer.strip()) < 20:
@@ -132,7 +133,7 @@ def grounding_check(mcqs: list[MCQ], qas: list[QA], chunks: dict[int, SourceChun
         chunk = locate_quote(q.source_quote, chunks, q.chunk_id)
         if chunk is None:
             continue
-        kept_q.append(Checked(q, chunk, evidence_window(chunk.text, q.source_quote, 900)))
+        kept_q.append(Checked(q, chunk, evidence_window(chunk.text, q.source_quote, 700)))
     return kept_m, kept_q
 
 
@@ -176,14 +177,21 @@ async def verify_kit(
     log.info("Grounding check kept %d/%d MCQs and %d/%d Q&A", len(kept_m), len(mcqs), len(kept_q), len(qas))
 
     if verifier is not None:
-        for items, render in ((kept_m, _render_mcq), (kept_q, _render_qa)):
-            prefix = "m" if render is _render_mcq else "q"
-            rendered = {f"{prefix}{i + 1}": render(f"{prefix}{i + 1}", c) for i, c in enumerate(items)}
-            try:
-                verdicts = await _run_verifier(verifier, rendered)
-            except LLMError as exc:
-                log.warning("Verifier unavailable, keeping quote-checked items: %s", exc)
+        groups = [(kept_m, _render_mcq, "m"), (kept_q, _render_qa, "q")]
+        rendered_groups = [
+            {f"{prefix}{i + 1}": render(f"{prefix}{i + 1}", c) for i, c in enumerate(items)}
+            for items, render, prefix in groups
+        ]
+        # Both checks go out at once instead of one after the other.
+        outcomes = await asyncio.gather(
+            *(_run_verifier(verifier, rendered) for rendered in rendered_groups), return_exceptions=True
+        )
+        for (items, _render, prefix), verdicts in zip(groups, outcomes):
+            if isinstance(verdicts, LLMError):
+                log.warning("Verifier unavailable, keeping quote-checked items: %s", verdicts)
                 continue
+            if isinstance(verdicts, BaseException):
+                raise verdicts
             survivors = []
             for i, c in enumerate(items):
                 verdict = verdicts.get(f"{prefix}{i + 1}")
