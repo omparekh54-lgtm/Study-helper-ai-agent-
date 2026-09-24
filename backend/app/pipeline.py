@@ -26,8 +26,7 @@ from app.services.youtube import find_videos
 
 log = logging.getLogger(__name__)
 
-MIN_MCQS = 4
-TOPIC_CONCURRENCY = 2
+MIN_MCQS = 3  # regenerate a kit (a whole extra AI call) only if fewer than this survive fact-checking
 
 
 def friendly_error(exc: Exception) -> str:
@@ -113,15 +112,19 @@ async def process_document(document_id: str, enqueue_video=None) -> None:
             )
 
         await refresh_progress()
-        sem = asyncio.Semaphore(TOPIC_CONCURRENCY)
+        sem = asyncio.Semaphore(max(1, get_settings().topic_concurrency))
 
         async def run(topic_id: str) -> None:
             async with sem:
-                await build_topic(topic_id, chunks, doc_title, enqueue_video)
+                await build_topic(topic_id, chunks, doc_title)
                 progress["done"] += 1
                 await refresh_progress()
 
         await asyncio.gather(*(run(tid) for tid in pending))
+
+        # Videos are CPU-heavy on the tiny free server, so they start only once every study kit is
+        # written. A user can still ask for one sooner from a topic page (that jumps the queue).
+        await queue_document_videos(document_id, enqueue_video)
 
         async with SessionLocal() as s:
             doc = await s.get(Document, document_id)
@@ -144,7 +147,29 @@ async def process_document(document_id: str, enqueue_video=None) -> None:
         await _set_doc(document_id, status="failed", stage="done", error=friendly_error(exc))
 
 
-async def build_topic(topic_id: str, chunks: dict[int, ChunkRef], doc_title: str, enqueue_video=None) -> None:
+async def queue_document_videos(document_id: str, enqueue_video=None) -> None:
+    if not get_settings().auto_generate_videos:
+        return
+    async with SessionLocal() as s:
+        topics = (
+            await s.scalars(
+                select(Topic).where(
+                    Topic.document_id == document_id,
+                    Topic.kit_status == "ready",
+                    Topic.video_status.in_(("none", "failed")),
+                ).order_by(Topic.idx)
+            )
+        ).all()
+        for t in topics:
+            t.video_status, t.video_detail, t.video_error = "queued", "Waiting in line", None
+        await s.commit()
+        ids = [t.id for t in topics]
+    if enqueue_video:
+        for tid in ids:
+            enqueue_video(tid, priority=10)
+
+
+async def build_topic(topic_id: str, chunks: dict[int, ChunkRef], doc_title: str) -> None:
     settings = get_settings()
     async with SessionLocal() as s:
         topic = await s.get(Topic, topic_id)
@@ -196,12 +221,7 @@ async def build_topic(topic_id: str, chunks: dict[int, ChunkRef], doc_title: str
             topic.youtube_query = kit.youtube_query
             topic.youtube = youtube
             topic.kit_status = "ready"
-            queue_video = settings.auto_generate_videos and topic.video_status in ("none", "failed")
-            if queue_video:
-                topic.video_status, topic.video_detail, topic.video_error = "queued", "Waiting in line", None
             await s.commit()
-        if queue_video and enqueue_video:
-            enqueue_video(topic_id, priority=10)
         log.info("Topic %s ready: %d MCQs, %d Q&A", topic_id, len(mcqs), len(qas))
 
     except Exception as exc:  # noqa: BLE001
