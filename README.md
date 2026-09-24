@@ -60,7 +60,7 @@ If the verifier is unavailable, items that passed step 1 are labelled **Source-c
 - **Progressive UX.** Topic cards appear as soon as the outline is ready, each unlocking as its kit finishes, so you can start studying topic 1 while topic 8 is still being written.
 - **Deduplication.** Re-uploading the same file returns the existing study kit instantly (SHA-256 content hash), which saves quota.
 - **Graceful degradation.** No YouTube key: targeted search links instead of embeds. TTS outage: gTTS, then a captioned silent video. Verifier outage: Source-checked labels.
-- **Tested.** 56 backend tests, including the real Gemini and Groq SDK code paths against mocked HTTP (model fallback, quota exhaustion, bad keys, malformed JSON) and a full upload → video → PDF end-to-end run with an offline provider.
+- **Tested.** 59 backend tests, including the real Gemini and Groq SDK code paths against mocked HTTP (model fallback, quota exhaustion, bad keys, malformed JSON) and a full upload → video → PDF end-to-end run with an offline provider.
 
 ## Project structure
 
